@@ -1,0 +1,56 @@
+# Sifter profile: the what-over-how corpus.
+# Used to rank archive folders for rescue-worthiness. No private names here;
+# this file may travel with reports.
+
+name: what-over-how corpus
+statement: >
+  I am rescuing a 30-year personal corpus of essays, frameworks, product
+  concepts, journals, capture systems, and civic-tool designs for
+  publication and legacy. I want folders containing my own writing, my own
+  project designs and specs, early versions of my named projects, journals
+  and notes, inventions, and any substantial original creation of mine.
+  Client work, framework tutorials, media dumps, and third-party code are
+  low value.
+
+projects:
+  - What Over How
+  - FocusFreely / Focus Freely
+  - exoMetaCortex / EMC
+  - Chilon
+  - Terra Mecha Chronos / TerraChronos / MechaChronos
+  - My Pebble Inbox / MyPI
+  - My Hometown Square / MHTS / HHHT / Calendar Commons
+  - Commonocracy
+  - InterLike
+  - xFacts / AppFacts / ModelFacts / my*facts family
+  - Living Legacy
+  - Levels of Legacy
+  - Dad's Keys
+  - Kindle & Cultivate
+  - pleasereadthelaw.com
+  - Sam Talks / Wonder Talks
+
+topics:
+  - personal essays and axiom lists
+  - stewardship and legacy
+  - life capture systems and journaling
+  - personal organization systems and taxonomies
+  - civic platforms and community tools
+  - inventions and patents
+  - domain name records
+  - frameworks and mental models
+  - wonder, teaching, transmission
+
+terms:
+  - pebble
+  - steward
+  - legacy
+  - dynamo
+  - attitude
+  - wonder
+  - fence
+  - hometown
+  - commons
+  - facts
+  - journal
+  - ".ff"
