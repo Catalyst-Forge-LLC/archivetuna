@@ -35,15 +35,34 @@ const VISION_SCHEMA = {
   required: ["description", "category", "tags"],
 };
 
-const prompt = (name: string): string =>
+const prompt = (name: string, cluePath: string): string =>
   `This is a 5-view render collage (top, front, left, right, perspective) ` +
-  `of a single 3D-printable STL model. Filename: ${name}. ` +
+  `of a single 3D-printable STL model.\n` +
+  `Filename: ${name}\n` +
+  `Path in the archive: ${cluePath}\n` +
+  `Treat the filename and folder names as strong clues to the object's ` +
+  `identity — they were written by the maker. Decode terse shorthand ` +
+  `(e.g. "1.5 sch 40 pip cover" means a cover for 1.5-inch schedule-40 ` +
+  `pipe; a numbered folder name often names the project the part belongs ` +
+  `to). Reconcile the clues with what you actually see in the renders; ` +
+  `if they conflict, say so in the description.\n` +
   `Describe what the object is and what it is likely for (2-3 sentences), ` +
-  `pick the best-fitting category, and give 3-6 catalog tags.`;
+  `pick the best-fitting category (${CATEGORIES.join(" | ")}), ` +
+  `and give 3-6 catalog tags.`;
 
-async function describeCollage(o: OllamaOptions, collage: string, stlName: string): Promise<Vision> {
+/** Last few path segments — enough context to include the project folder,
+ * regardless of where the scan was rooted. */
+function cluePath(absStl: string, segments = 4): string {
+  return absStl.replaceAll("\\", "/").split("/").filter(Boolean).slice(-segments).join("/");
+}
+
+async function describeCollage(
+  o: OllamaOptions,
+  collage: string,
+  stl: string,
+): Promise<Vision> {
   const image = readFileSync(collage).toString("base64");
-  return generateJson<Vision>(o, prompt(stlName), VISION_SCHEMA, { images: [image] });
+  return generateJson<Vision>(o, prompt(basename(stl), cluePath(stl)), VISION_SCHEMA, { images: [image] });
 }
 
 const q = (s: string): string => JSON.stringify(s); // JSON string = valid YAML scalar
@@ -114,7 +133,7 @@ export async function metaBatch(
         continue;
       }
       try {
-        vision = await describeCollage(ollama, collage, basename(stl));
+        vision = await describeCollage(ollama, collage, stl);
         model = ollama.model;
       } catch (err) {
         res.failed++;
