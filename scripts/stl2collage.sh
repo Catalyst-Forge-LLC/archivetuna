@@ -13,16 +13,19 @@ outdir="${2:-.}"
 mkdir -p "$outdir"
 base="$(basename "${stl%.*}")"
 
-render() { # name camera-direction
-  "$F3D" "$stl" --output="$outdir/$base-$1.png" --resolution="$RES" \
-    --up=+z --camera-direction="$2" 2>/dev/null
+render() { # name camera-direction [extra-args...]
+  local name="$1" dir="$2"; shift 2
+  "$F3D" "$stl" --output="$outdir/$base-$name.png" --resolution="$RES" \
+    --up=+z --camera-direction="$dir" --filename=false "$@" 2>/dev/null
 }
 
-render top          "0,0,-1"
-render front        "0,1,0"
-render left         "1,0,0"
-render right        "-1,0,0"
-render perspective  "-1,1,-1"
+# Orthographic views: no axes gizmo (the tile label already names the
+# orientation). Perspective keeps it, where it actually helps.
+render top          "0,0,-1"  --axis=false
+render front        "0,1,0"   --axis=false
+render left         "1,0,0"   --axis=false
+render right        "-1,0,0"  --axis=false
+render perspective  "-1,1,-1" --axis=true
 
 mtime="$(date -r "$stl" +%Y-%m-%d 2>/dev/null || echo unknown)"
 title="$base   ·   file date: $mtime"
