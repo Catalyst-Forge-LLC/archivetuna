@@ -9,8 +9,10 @@ statement: >
   publication and legacy. I want folders containing my own writing, my own
   project designs and specs, early versions of my named projects, journals
   and notes, inventions, and any substantial original creation of mine.
-  Client work, framework tutorials, media dumps, and third-party code are
-  low value.
+  Records of my own businesses (invoices, licenses, brochures, proposals,
+  early client sites) are valuable provenance even when the work itself is
+  routine. Framework tutorials, media dumps, and third-party code are low
+  value.
 
 projects:
   - What Over How
@@ -29,6 +31,11 @@ projects:
   - Kindle & Cultivate
   - pleasereadthelaw.com
   - Sam Talks / Wonder Talks
+  - Einstein Technologies / einstein-tech.com
+  - SlyngShot / Slyngshot
+  - Danlas / danlas.com
+  - MillAvenue.com
+  - IBRAS
 
 topics:
   - personal essays and axiom lists
@@ -40,6 +47,9 @@ topics:
   - domain name records
   - frameworks and mental models
   - wonder, teaching, transmission
+  - resumes and self-presentations across years
+  - everyday carry (EDC) builds and gear
+  - own-business records (invoices, licenses, proposals)
 
 terms:
   - pebble
