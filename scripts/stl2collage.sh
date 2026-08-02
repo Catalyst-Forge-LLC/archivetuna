@@ -24,6 +24,9 @@ render left         "1,0,0"
 render right        "-1,0,0"
 render perspective  "-1,1,-1"
 
+mtime="$(date -r "$stl" +%Y-%m-%d 2>/dev/null || echo unknown)"
+title="$base   ·   file date: $mtime"
+
 "$MAGICK" montage \
   -label top         "$outdir/$base-top.png" \
   -label front       "$outdir/$base-front.png" \
@@ -31,6 +34,7 @@ render perspective  "-1,1,-1"
   -label right       "$outdir/$base-right.png" \
   -label perspective "$outdir/$base-perspective.png" \
   -tile 3x2 -geometry +6+6 -background white -pointsize 22 \
+  -title "$title" \
   "$outdir/$base-collage.png"
 
 echo "$outdir/$base-collage.png"
