@@ -23,6 +23,7 @@ export async function generateJson<T>(
   o: OllamaOptions,
   prompt: string,
   schema: object,
+  extra?: { images?: string[] },
 ): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(`${o.url}/api/generate`, {
@@ -33,6 +34,8 @@ export async function generateJson<T>(
         prompt,
         stream: false,
         format: schema,
+        ...(extra?.images ? { images: extra.images } : {}),
+        keep_alive: "30m",
         options: { temperature: 0.1 },
       }),
     });

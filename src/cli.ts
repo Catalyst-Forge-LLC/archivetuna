@@ -7,6 +7,9 @@ import { buildDirStats, analyzeDupes } from "./dupes.js";
 import { checkHealth } from "./ollama.js";
 import { describeStage, rankStage, selectTargets } from "./stages.js";
 import { writeReports } from "./report.js";
+import { collageBatch, renderCollage } from "./collage.js";
+import { metaBatch } from "./sidecar.js";
+import { statSync } from "node:fs";
 import type { Manifest } from "./types.js";
 
 function parseArgs(argv: string[]): { cmd: string; positional: string[]; flags: Record<string, string | boolean> } {
@@ -39,12 +42,18 @@ Usage:
   sifter report           stage 4: write report.md / dupes.md / novel.md / report.json
   sifter status           cache and Ollama health
 
+  sifter collage <stl|dir>  five-view collage(s); recursive for a dir,
+                            output adjacent to each STL, skips existing
+  sifter meta <dir>         <name>.stl.yaml sidecars from collages via
+                            local vision model (--no-vision for facts only)
+
 Flags:
   --out <dir>       output/cache dir (default ./sifter-out)
   --tier <0-3>      privacy tier (default 1; content is read only at 2+)
   --profile <file>  profile YAML (required for rank/run)
   --model <name>    Ollama model (default gemma4:12b)
-  --limit <n>       cap number of folders sent to LLM stages
+  --limit <n>       cap number of folders sent to LLM stages / sidecars written
+  --no-vision       meta: skip the vision description, machine facts only
   --dry-run         show what would be read/sent, without doing it
 `);
 }
@@ -97,6 +106,35 @@ async function main(): Promise<void> {
         `(superset ${res.pairs.filter((p) => p.kind === "superset").length}, ` +
         `diverged ${res.pairs.filter((p) => p.kind === "diverged").length}, ` +
         `collisions ${res.pairs.filter((p) => p.kind === "name-collision").length})`);
+      break;
+    }
+    case "collage": {
+      const target = positional[0];
+      if (!target) return usage();
+      const t = resolve(target);
+      if (statSync(t).isDirectory()) {
+        const r = collageBatch(t, console.log);
+        console.log("----");
+        console.log(`rendered: ${r.rendered}  skipped(existing): ${r.skipped}  failed: ${r.failed}`);
+      } else {
+        console.log(renderCollage(t, flags["out"] ? String(flags["out"]) : undefined));
+      }
+      break;
+    }
+    case "meta": {
+      const root = positional[0];
+      if (!root) return usage();
+      const vision = !flags["no-vision"];
+      if (vision) {
+        const h = await checkHealth(ollama);
+        if (!h.ok) {
+          console.error(`Ollama not ready: ${h.message}`);
+          process.exit(1);
+        }
+      }
+      const r = await metaBatch(resolve(root), ollama, { vision, limit: cfg.limit || undefined }, console.log);
+      console.log("----");
+      console.log(`written: ${r.written}  skipped(existing): ${r.skipped}  failed: ${r.failed}  missing-collage: ${r.missingCollage}`);
       break;
     }
     case "status": {
