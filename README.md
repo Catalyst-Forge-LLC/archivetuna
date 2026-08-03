@@ -48,3 +48,7 @@ plus known projects, topics, and terms. See `profiles/corpus.yaml`.
 Full spec: `what-over-how/drafts/sifter-spec.md` (v1 deviations: JSON
 caches instead of SQLite, sha256 instead of BLAKE3, same-name pairwise
 comparison instead of global MinHash).
+
+Optional Windows accelerator (not implemented yet): Voidtools Everything
+via `es.exe` as a Stage 0 backend and lead-finder — see
+[`docs/everything-backend.md`](docs/everything-backend.md).
