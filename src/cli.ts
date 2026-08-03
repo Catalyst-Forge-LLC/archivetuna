@@ -30,10 +30,21 @@ function parseArgs(argv: string[]): { cmd: string; positional: string[]; flags: 
   return { cmd, positional, flags };
 }
 
+const COMMANDS = new Set([
+  "run", "scan", "dupes", "describe", "rank", "report", "status",
+  "collage", "meta", "help",
+]);
+
 function usage(): void {
   console.log(`sifter — local-first archive triage (nothing leaves this machine)
 
 Usage:
+  sifter <dir>            STL pipeline: collage then meta (the usual command)
+  sifter collage <stl|dir>  five-view collage(s) only; recursive for a dir,
+                            output adjacent to each STL, skips existing
+  sifter meta <dir>         <name>.stl.yaml sidecars only (needs collages;
+                            --no-vision for facts only)
+
   sifter run <root>       all stages: scan, dupes, describe, rank, report
   sifter scan <root>      stage 0: inventory (folders + file metadata only)
   sifter dupes            stage 1: duplicate analysis from cached manifest
@@ -41,11 +52,6 @@ Usage:
   sifter rank             stage 3: relevance vs profile
   sifter report           stage 4: write report.md / dupes.md / novel.md / report.json
   sifter status           cache and Ollama health
-
-  sifter collage <stl|dir>  five-view collage(s); recursive for a dir,
-                            output adjacent to each STL, skips existing
-  sifter meta <dir>         <name>.stl.yaml sidecars from collages via
-                            local vision model (--no-vision for facts only)
 
 Flags:
   --out <dir>       output/cache dir (default ./sifter-out)
@@ -56,6 +62,34 @@ Flags:
   --no-vision       meta: skip the vision description, machine facts only
   --dry-run         show what would be read/sent, without doing it
 `);
+}
+
+async function runCollage(target: string, outFlag: string | boolean | undefined): Promise<void> {
+  const t = resolve(target);
+  if (statSync(t).isDirectory()) {
+    const r = collageBatch(t, console.log);
+    console.log("----");
+    console.log(`rendered: ${r.rendered}  skipped(existing): ${r.skipped}  failed: ${r.failed}`);
+  } else {
+    console.log(renderCollage(t, outFlag ? String(outFlag) : undefined));
+  }
+}
+
+async function runMeta(
+  root: string,
+  ollama: { url: string; model: string },
+  opts: { vision: boolean; limit?: number },
+): Promise<void> {
+  if (opts.vision) {
+    const h = await checkHealth(ollama);
+    if (!h.ok) {
+      console.error(`Ollama not ready: ${h.message}`);
+      process.exit(1);
+    }
+  }
+  const r = await metaBatch(resolve(root), ollama, opts, console.log);
+  console.log("----");
+  console.log(`written: ${r.written}  skipped(existing): ${r.skipped}  failed: ${r.failed}  missing-collage: ${r.missingCollage}`);
 }
 
 function loadManifestOrDie(cfg: SifterConfig): Manifest {
@@ -73,7 +107,12 @@ const progress = (label: string) => (done: number, total: number, path: string) 
 };
 
 async function main(): Promise<void> {
-  const { cmd, positional, flags } = parseArgs(process.argv.slice(2));
+  let { cmd, positional, flags } = parseArgs(process.argv.slice(2));
+  // Bare path (`sifter <dir>`) → collage then meta.
+  if (!COMMANDS.has(cmd)) {
+    positional = [cmd, ...positional];
+    cmd = "folder";
+  }
   const overrides: Partial<SifterConfig> = {};
   if (flags["out"]) overrides.out = String(flags["out"]);
   if (flags["tier"]) overrides.tier = Number(flags["tier"]) as SifterConfig["tier"];
@@ -82,8 +121,24 @@ async function main(): Promise<void> {
   if (flags["dry-run"]) overrides.dryRun = true;
   const cfg = loadConfig(process.cwd(), overrides);
   const ollama = { url: cfg.ollamaUrl, model: cfg.model };
+  const vision = !flags["no-vision"];
+  const metaOpts = { vision, limit: cfg.limit || undefined };
 
   switch (cmd) {
+    case "folder": {
+      const root = positional[0];
+      if (!root) return usage();
+      const t = resolve(root);
+      if (!existsSync(t) || !statSync(t).isDirectory()) {
+        console.error(`Expected a directory: ${root}`);
+        process.exit(1);
+      }
+      console.log(`[1/2] Collage ${t} ...`);
+      await runCollage(t, flags["out"]);
+      console.log(`[2/2] Meta ${t} ...`);
+      await runMeta(t, ollama, metaOpts);
+      break;
+    }
     case "scan": {
       const root = positional[0];
       if (!root) return usage();
@@ -111,30 +166,13 @@ async function main(): Promise<void> {
     case "collage": {
       const target = positional[0];
       if (!target) return usage();
-      const t = resolve(target);
-      if (statSync(t).isDirectory()) {
-        const r = collageBatch(t, console.log);
-        console.log("----");
-        console.log(`rendered: ${r.rendered}  skipped(existing): ${r.skipped}  failed: ${r.failed}`);
-      } else {
-        console.log(renderCollage(t, flags["out"] ? String(flags["out"]) : undefined));
-      }
+      await runCollage(target, flags["out"]);
       break;
     }
     case "meta": {
       const root = positional[0];
       if (!root) return usage();
-      const vision = !flags["no-vision"];
-      if (vision) {
-        const h = await checkHealth(ollama);
-        if (!h.ok) {
-          console.error(`Ollama not ready: ${h.message}`);
-          process.exit(1);
-        }
-      }
-      const r = await metaBatch(resolve(root), ollama, { vision, limit: cfg.limit || undefined }, console.log);
-      console.log("----");
-      console.log(`written: ${r.written}  skipped(existing): ${r.skipped}  failed: ${r.failed}  missing-collage: ${r.missingCollage}`);
+      await runMeta(root, ollama, metaOpts);
       break;
     }
     case "status": {
