@@ -43,12 +43,35 @@ Outputs in `./sifter-out/`: `report.md` (ranked review queue),
 A profile is a small YAML file: a statement of what you're looking for,
 plus known projects, topics, and terms. See `profiles/corpus.yaml`.
 
+## Modes
+
+Core triage understands *folders*. **Modes** enrich specific *file
+classes* (find → inspect → meta). More types will land over time.
+
+### Models (3D)
+
+Find STL models, render a five-view collage, and write an adjacent
+YAML sidecar (machine facts + optional local vision description):
+
+```bash
+# target CLI (see docs/sifter-spec.md); today: collage / meta subcommands
+pnpm sifter models path/to/stl-folder
+pnpm sifter models collage path/to/stl-folder   # collage only
+pnpm sifter models meta path/to/stl-folder      # sidecars only
+```
+
+Current v0.1 still exposes top-level `collage` / `meta` (and a bare-path
+shortcut); the v2 spec renames the user-facing mode to `sifter models`.
+
 ## Spec
 
-Full spec: `what-over-how/drafts/sifter-spec.md` (v1 deviations: JSON
-caches instead of SQLite, sha256 instead of BLAKE3, same-name pairwise
-comparison instead of global MinHash).
+Living product/architecture spec: [`docs/sifter-spec.md`](docs/sifter-spec.md).
 
 Optional Windows accelerator (not implemented yet): Voidtools Everything
 via `es.exe` as a Stage 0 backend and lead-finder — see
 [`docs/everything-backend.md`](docs/everything-backend.md).
+
+Corpus-side origin draft (historical): `what-over-how/drafts/sifter-spec.md`
+(v1 deviations noted there and in the v2 status table: JSON caches
+instead of SQLite, sha256 instead of BLAKE3, same-name pairwise
+comparison instead of global MinHash).
