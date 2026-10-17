@@ -27,15 +27,17 @@ not update the README embedded in the existing tarball.
 
 ## Git
 
-Intended repository (confirmed by operator): https://github.com/Catalyst-Forge-LLC/archivetuna
-Public access returned 404 on 2026-10-17; authenticated gh could not resolve it.
-Public site links are withheld until the repository is accessible.
-Intended production branch: main. The existing local checkout is still on master;
-choose/rename the branch when publishing the public repository. Preserve the
-existing local backup remote.
-The operator handles Git pushes. Confirm the public repository exists and add
-its origin before the operator's first push. No GitHub repository is implied by
-package metadata or a link.
+Public repository: https://github.com/Catalyst-Forge-LLC/archivetuna
+Origin: https://github.com/Catalyst-Forge-LLC/archivetuna.git
+Local release branch: main. The previous master branch was renamed to match
+the intended production branch; the existing backup remote is preserved.
+
+On 2026-10-17, the repository was verified public and empty. Public links are
+restored. The operator handles the initial source push from the repository root:
+
+```sh
+git push -u origin main
+```
 
 ## FilePress
 

@@ -10,10 +10,11 @@ which records the earlier pre-publication checks.
   npm as a name reservation. Updated the source to describe the published CLI,
   added the install command to the landing page, and removed the obsolete
   source-checkout prerequisite.
-- The intended public GitHub repository returned HTTP 404; authenticated gh
-  could not resolve it either. Removed dead public navigation links. Repository
-  publication remains an operator follow-up. Existing npm repository metadata
-  still points there; make the repository accessible or correct it for a later release.
+- The intended public GitHub repository initially returned HTTP 404. After the
+  operator supplied the repository, it was verified public and empty on
+  2026-10-17. Origin is configured, the local branch is main, and public links
+  are restored. The operator still needs to push the source. Existing npm
+  repository metadata already points to this correct URL.
 - Relative README links pointed into guide files excluded from the npm tarball.
   They now point to the working public documentation routes.
 - Added the ArchiveTuna illustration to the site, guide, and README, and added

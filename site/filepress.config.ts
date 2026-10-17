@@ -12,6 +12,7 @@ export default defineFilepressConfig({
     { label: 'Home', href: '/' },
     { label: 'Docs', href: '/docs/' },
     { label: 'Example report', href: '/docs/example' },
+    { label: 'GitHub', href: 'https://github.com/Catalyst-Forge-LLC/archivetuna', icon: 'github' },
   ],
   footerLinks: [
     { label: 'npm', href: 'https://www.npmjs.com/package/archivetuna' },

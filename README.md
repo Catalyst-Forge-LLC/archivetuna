@@ -15,7 +15,8 @@ beside the models you select.
 
 [Documentation](https://archivetuna.dev/docs/) ·
 [Example report](https://archivetuna.dev/docs/example/) ·
-[npm](https://www.npmjs.com/package/archivetuna)
+[npm](https://www.npmjs.com/package/archivetuna) ·
+[GitHub](https://github.com/Catalyst-Forge-LLC/archivetuna)
 
 ## Install
 
