@@ -29,7 +29,9 @@ site's preview notice only when the real package is available.
 ## Git
 
 Intended repository (confirmed by operator): https://github.com/Catalyst-Forge-LLC/archivetuna
-Production branch: main. Preserve the existing local backup remote.
+Intended production branch: main. The existing local checkout is still on master;
+choose/rename the branch when publishing the public repository. Preserve the
+existing local backup remote.
 The operator handles Git pushes. Confirm the public repository exists and add
 its origin before the operator's first push. No GitHub repository is implied by
 package metadata or a link.
@@ -58,6 +60,9 @@ DNS, public repository availability, and npm publication are separate release
 steps. Confirm the public docs routes and installation command after deployment.
 
 ## LocalHelm
+
+The workspace fleet was checked on 2026-10-17: this project is not enrolled.
+Status/Publish-plan validation therefore does not apply yet.
 
 Use the stable repository root as the npm release target. site/ is a private
 development/site package and must never be the npm Publish target. No generated

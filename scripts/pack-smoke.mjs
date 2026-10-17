@@ -28,6 +28,8 @@ assert.equal(JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')).n
 assert.equal(readFileSync(join(installed, 'README.md'), 'utf8'), readFileSync(join(root, 'README.md'), 'utf8'));
 assert(readFileSync(join(installed, 'dist/cli.js'), 'utf8').startsWith('#!/usr/bin/env node'));
 const run = (...args) => execFileSync(process.execPath, [join(installed, 'dist/cli.js'), ...args], { cwd: consumer, encoding: 'utf8' });
+const binVersion = execFileSync(process.execPath, [cli, 'exec', '--offline', '--', 'archivetuna', '--version'], { cwd: consumer, encoding: 'utf8' });
+assert.equal(binVersion.trim(), pkg.version);
 assert.equal(run('--version').trim(), pkg.version); assert.match(run('--help'), /ArchiveTuna/);
 run('init'); assert(existsSync(join(consumer, 'profile.yaml')));
 run('scan', installed, '--out', join(consumer, 'review'));

@@ -28,6 +28,9 @@ If npm still contains a name-reservation package, use the source checkout.
 
 ## Source install
 
+The public repository is the intended release location. Until it is created and
+pushed, use your existing local checkout. Once public:
+
 ```sh
 git clone https://github.com/Catalyst-Forge-LLC/archivetuna.git
 cd archivetuna

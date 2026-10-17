@@ -1,0 +1,26 @@
+{
+  "name": "archivetuna-site",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:build": "node scripts/build-docs.mjs",
+    "dev": "pnpm docs:build && filepress dev --host 127.0.0.1",
+    "build": "pnpm docs:build && filepress build && node scripts/check-site.mjs",
+    "preview": "filepress preview",
+    "ship": "pnpm build && wrangler pages deploy build --project-name archivetuna --branch main"
+  },
+  "devDependencies": {
+    "getfilepress": "0.1.50",
+    "wrangler": "^4.120.1",
+    "marked": "^16.4.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "getfilepress",
+      "sharp",
+      "workerd"
+    ]
+  }
+}

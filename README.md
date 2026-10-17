@@ -25,7 +25,10 @@ npm install -g archivetuna
 archivetuna --help
 ```
 
-For development or before the first npm release:
+These npm commands apply once version 0.2.0 is published. The current name-hold
+package is not the CLI.
+
+After the public repository is created and pushed, install from source:
 
 ```sh
 git clone https://github.com/Catalyst-Forge-LLC/archivetuna.git
