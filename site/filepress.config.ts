@@ -5,14 +5,13 @@ export default defineFilepressConfig({
   tagline: 'Bring your digital past forward.',
   url: 'https://archivetuna.dev',
   author: 'Catalyst Forge LLC',
-  logo: '/mark.svg',
+  logo: '/logo.png',
   homePage: 'home',
   theme: 'folio',
   nav: [
     { label: 'Home', href: '/' },
     { label: 'Docs', href: '/docs/' },
     { label: 'Example report', href: '/docs/example' },
-    { label: 'GitHub', href: 'https://github.com/Catalyst-Forge-LLC/archivetuna', icon: 'github' },
   ],
   footerLinks: [
     { label: 'npm', href: 'https://www.npmjs.com/package/archivetuna' },

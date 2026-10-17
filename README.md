@@ -1,5 +1,7 @@
 # ArchiveTuna
 
+<img src="https://archivetuna.dev/logo.png" width="440" alt="ArchiveTuna: a silver-blue tuna with archive drawings and digital fragments.">
+
 **Digital archaeology for the things you made, collected, and forgot.**
 
 Point ArchiveTuna at an old folder tree. It inventories what survives, groups
@@ -12,8 +14,8 @@ output directory. The optional STL workflow writes previews and YAML sidecars
 beside the models you select.
 
 [Documentation](https://archivetuna.dev/docs/) ·
-[Example report](docs/guide/example.md) ·
-[GitHub](https://github.com/Catalyst-Forge-LLC/archivetuna)
+[Example report](https://archivetuna.dev/docs/example/) ·
+[npm](https://www.npmjs.com/package/archivetuna)
 
 ## Install
 
@@ -25,18 +27,7 @@ npm install -g archivetuna
 archivetuna --help
 ```
 
-These npm commands apply once version 0.2.0 is published. The current name-hold
-package is not the CLI.
-
-After the public repository is created and pushed, install from source:
-
-```sh
-git clone https://github.com/Catalyst-Forge-LLC/archivetuna.git
-cd archivetuna
-pnpm install
-pnpm build
-node dist/cli.js --help
-```
+Version 0.2.0 is available on npm.
 
 ## Start with an inventory
 
@@ -108,7 +99,7 @@ endpoint. For additional protection, run Ollama with `OLLAMA_NO_CLOUD=1`.
 Model downloads need network access. Local reports and profiles can contain
 sensitive paths and text-derived information; share them deliberately.
 
-See [privacy and evidence](docs/guide/privacy.md) for the exact boundaries.
+See [privacy and evidence](https://archivetuna.dev/docs/privacy/) for the exact boundaries.
 
 ## Run stages separately
 
@@ -147,7 +138,7 @@ This explicit image workflow is separate from the text evidence tiers.
 ## Configuration and migration
 
 Put overrides in `archivetuna.config.json` in the working directory.
-See the [configuration reference](docs/guide/configuration.md).
+See the [configuration reference](https://archivetuna.dev/docs/configuration/).
 
 ArchiveTuna was previously called **Sifter**. The source folder may still be named
 `sifter`. The command is now `archivetuna`; bare directory arguments print a
@@ -169,7 +160,7 @@ pnpm site:build
 ```
 
 The npm package is the repository root. The FilePress site is `site/`;
-`docs/guide/` supplies its `/docs` pages. See [release instructions](docs/RELEASE.md).
+`docs/guide/` supplies its `/docs` pages. Maintainers can find release instructions in `docs/RELEASE.md` in the source checkout.
 Everything integration and additional file modes are planned, not implemented.
 
 **Sibling tool:** [MediaTuna](https://mediatuna.dev) makes older video and audio

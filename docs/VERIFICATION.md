@@ -1,4 +1,4 @@
-# Release verification — 2026-10-17
+# Pre-publication verification — 2026-10-17
 
 ArchiveTuna 0.2.0 is prepared locally in Z:/workspace/archivetuna (renamed from sifter).
 

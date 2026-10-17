@@ -1,6 +1,6 @@
 # ArchiveTuna release contract
 
-Status: 0.2.0 prepared locally; npm publication and domain registration are operator-owned.
+Status: archivetuna@0.2.0 is published; https://archivetuna.dev and all guide routes were verified live on 2026-10-17. Git pushes and npm publication remain operator-owned.
 The checkout is now at Z:/workspace/archivetuna. Its public product/package name is ArchiveTuna/archivetuna.
 
 ## npm
@@ -21,14 +21,15 @@ The files allowlist includes dist/, profiles/starter.yaml, README.md, and LICENS
 It excludes scratch images, the personal corpus profile, development source,
 tests, and the private site package.
 
-If the npm name is held by a reservation release, verify the registry version
-before publishing 0.2.0. Do not overwrite or assume ownership from a name match.
-After publication, inspect npm's name/version and packed README, then update the
-site's preview notice only when the real package is available.
+The registry 0.2.0 release was installed and exercised in a fresh consumer directory.
+README changes after publication require a new npm release; shipping the site does
+not update the README embedded in the existing tarball.
 
 ## Git
 
 Intended repository (confirmed by operator): https://github.com/Catalyst-Forge-LLC/archivetuna
+Public access returned 404 on 2026-10-17; authenticated gh could not resolve it.
+Public site links are withheld until the repository is accessible.
 Intended production branch: main. The existing local checkout is still on master;
 choose/rename the branch when publishing the public repository. Preserve the
 existing local backup remote.
@@ -46,8 +47,8 @@ package metadata or a link.
 - Output directory: site/build
 - Confirmed intended Cloudflare Pages project: archivetuna
 - Production branch: main
-- Intended domain: https://archivetuna.dev
-- Pages URL after provisioning: https://archivetuna.pages.dev
+- Live domain: https://archivetuna.dev
+- Live Pages URL: https://archivetuna.pages.dev
 - Hosting account: verify the operator's authenticated account before provisioning/deploying
 - Local deployment CLI: site/node_modules/.bin/wrangler
 - Site Ship: pnpm --dir site ship
@@ -61,14 +62,11 @@ steps. Confirm the public docs routes and installation command after deployment.
 
 ## LocalHelm
 
-The workspace fleet was checked on 2026-10-17: this project is not enrolled.
-Status/Publish-plan validation therefore does not apply yet.
-
 Use the stable repository root as the npm release target. site/ is a private
 development/site package and must never be the npm Publish target. No generated
 release-target manifest is needed for this layout.
 
-If enrolled, run read-only status and a Publish plan for the enrolled id. Verify
+For each release, run read-only status and a Publish plan for the enrolled id. Verify
 name archivetuna, directory Z:/workspace/archivetuna, root package.json as version
 source, root README.md, prepack/build execution, and dist/cli.js. A quiet or
 skipped row does not prove publication. Do not use --apply during preparation.

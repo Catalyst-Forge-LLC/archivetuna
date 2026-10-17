@@ -16,32 +16,13 @@ inventory uses portable Node APIs. Linux/macOS behavior needs platform testing.
 
 ## Published package
 
-Once the 0.2.0 release is published:
+Install the published CLI from npm (version 0.2.0):
 
 ```sh
 npm install -g archivetuna
 archivetuna --version
 archivetuna --help
 ```
-
-If npm still contains a name-reservation package, use the source checkout.
-
-## Source install
-
-The public repository is the intended release location. Until it is created and
-pushed, use your existing local checkout. Once public:
-
-```sh
-git clone https://github.com/Catalyst-Forge-LLC/archivetuna.git
-cd archivetuna
-pnpm install
-pnpm build
-node dist/cli.js --help
-```
-
-In an existing local checkout, begin with pnpm install. The original checkout
-directory may still be named sifter. Replace archivetuna with node dist/cli.js
-in commands below when running from source.
 
 ## First inventory
 
