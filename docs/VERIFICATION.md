@@ -1,8 +1,12 @@
 # Release verification — 2026-10-17
 
-ArchiveTuna 0.2.0 is prepared locally in the existing Sifter checkout.
+ArchiveTuna 0.2.0 is prepared locally in Z:/workspace/archivetuna (renamed from sifter).
 
 ## Verified
+
+- After the folder rename, LocalHelm scan finds id/path/npm name archivetuna,
+  version 0.2.0, Git, and the nested FilePress site. The enrollment plan targets
+  the repository root; enrollment is left to the dashboard.
 
 - CLI regression suite: 11 tests covering argument validation, safe dry-runs,
   evidence tiers, metadata candidates, cache identity, saved stages, local-model

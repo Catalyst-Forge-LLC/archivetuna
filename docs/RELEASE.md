@@ -1,7 +1,7 @@
 # ArchiveTuna release contract
 
 Status: 0.2.0 prepared locally; npm publication and domain registration are operator-owned.
-The checkout remains at Z:/workspace/sifter. Its public product/package name is ArchiveTuna/archivetuna.
+The checkout is now at Z:/workspace/archivetuna. Its public product/package name is ArchiveTuna/archivetuna.
 
 ## npm
 
@@ -69,7 +69,7 @@ development/site package and must never be the npm Publish target. No generated
 release-target manifest is needed for this layout.
 
 If enrolled, run read-only status and a Publish plan for the enrolled id. Verify
-name archivetuna, directory Z:/workspace/sifter, root package.json as version
+name archivetuna, directory Z:/workspace/archivetuna, root package.json as version
 source, root README.md, prepack/build execution, and dist/cli.js. A quiet or
 skipped row does not prove publication. Do not use --apply during preparation.
 
