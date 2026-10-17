@@ -1,3 +1,5 @@
+> Historical Sifter design (August 2026). The current product is ArchiveTuna. See [the README](../README.md), [current guide](guide/getting-started.md), and [release contract](RELEASE.md). These proposals are not a command reference.
+
 # Everything (`es.exe`) as a Sifter inventory backend
 
 *Spec addendum, 2026-08-03. Voidtools Everything is already on Sam's

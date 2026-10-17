@@ -1,4 +1,11 @@
 node_modules/
 dist/
 sifter-out/
+archivetuna-out/
 *.log
+*.tgz
+site/build/
+site/docs/dist/
+site/.filepress/
+site/.svelte-kit/
+site/.filepress-genie/

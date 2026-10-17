@@ -1,77 +1,176 @@
-# Sifter
+# ArchiveTuna
 
-Local-first archive triage. Point it at an old folder tree and get back a
-ranked review report: what each folder appears to be, which ones match
-what you care about, which are duplicates of each other, and which look
-like substantial work you forgot you had.
+**Digital archaeology for the things you made, collected, and forgot.**
 
-**Nothing leaves your machine.** All inference runs on a local model via
-Ollama (`localhost:11434`). Privacy tiers are hard boundaries in code:
+Point ArchiveTuna at an old folder tree. It inventories what survives, groups
+folders with matching metadata, and uses a local Ollama model to describe and
+rank the work against your interests. You get a review queue, explanations,
+and leads on projects you may have forgotten.
 
-- **T0** — the model sees folder names only
-- **T1** (default) — + file names, sizes, extension histograms
-- **T2** — + sampled content from a few small text files per folder
-- **T3** — + full text of small text files
+ArchiveTuna never moves or deletes your originals. Core triage writes to its
+output directory. The optional STL workflow writes previews and YAML sidecars
+beside the models you select.
 
-`--dry-run` shows exactly what would be read at the chosen tier.
+[Documentation](https://archivetuna.dev/docs/) ·
+[Example report](docs/guide/example.md) ·
+[GitHub](https://github.com/Catalyst-Forge-LLC/archivetuna)
 
-## Duplicate handling
+## Install
 
-Folder fingerprints (recursive name+size sets) classify same-name folders
-as **identical** (copies collapsed to one representative), **superset**
-(one contains everything in the other plus more — the diff is listed,
-because the "more" is what to review), **diverged** (both have unique
-material — review both, picking one loses data), or **name-collision**
-(same name, unrelated content). mtimes are recorded but never trusted:
-exports and copies overwrite them.
+Requires **Node.js 22+**. Inventory and duplicate analysis work without Ollama.
+Descriptions and rankings require a downloaded local model served by Ollama.
 
-## Usage
+```sh
+npm install -g archivetuna
+archivetuna --help
+```
 
-```bash
+For development or before the first npm release:
+
+```sh
+git clone https://github.com/Catalyst-Forge-LLC/archivetuna.git
+cd archivetuna
 pnpm install
-pnpm sifter run E:/archives/old-stuff --profile profiles/corpus.yaml --tier 1
-# stagewise:
-pnpm sifter scan E:/archives/old-stuff
-pnpm sifter dupes
-pnpm sifter status
+pnpm build
+node dist/cli.js --help
 ```
 
-Outputs in `./sifter-out/`: `report.md` (ranked review queue),
-`dupes.md`, `novel.md` (projects the profile didn't know about),
-`report.json` (machine-readable), plus resumable stage caches.
+## Start with an inventory
 
-A profile is a small YAML file: a statement of what you're looking for,
-plus known projects, topics, and terms. See `profiles/corpus.yaml`.
-
-## Modes
-
-Core triage understands *folders*. **Modes** enrich specific *file
-classes* (find → inspect → meta). More types will land over time.
-
-### Models (3D)
-
-Find STL models, render a five-view collage, and write an adjacent
-YAML sidecar (machine facts + optional local vision description):
-
-```bash
-# target CLI (see docs/sifter-spec.md); today: collage / meta subcommands
-pnpm sifter models path/to/stl-folder
-pnpm sifter models collage path/to/stl-folder   # collage only
-pnpm sifter models meta path/to/stl-folder      # sidecars only
+```sh
+archivetuna scan "/path/to/old-work" --out ./archive-review
+archivetuna dupes --out ./archive-review
 ```
 
-Current v0.1 still exposes top-level `collage` / `meta` (and a bare-path
-shortcut); the v2 spec renames the user-facing mode to `sifter models`.
+Read `archive-review/dupes.md`. Matching relative filenames and sizes are
+**duplicate candidates**, not proof of identical contents. ArchiveTuna keeps
+every candidate eligible for review. It does not perform content-hash verification.
 
-## Spec
+## Find work worth revisiting
 
-Living product/architecture spec: [`docs/sifter-spec.md`](docs/sifter-spec.md).
+```sh
+archivetuna init profile.yaml
+# Edit profile.yaml: describe your goals, projects, topics, and search terms.
 
-Optional Windows accelerator (not implemented yet): Voidtools Everything
-via `es.exe` as a Stage 0 backend and lead-finder — see
-[`docs/everything-backend.md`](docs/everything-backend.md).
+ollama pull gemma4:12b
+archivetuna doctor --model gemma4:12b
 
-Corpus-side origin draft (historical): `what-over-how/drafts/sifter-spec.md`
-(v1 deviations noted there and in the v2 status table: JSON caches
-instead of SQLite, sha256 instead of BLAKE3, same-name pairwise
-comparison instead of global MinHash).
+archivetuna run "/path/to/old-work" --profile profile.yaml --out ./archive-review --dry-run
+archivetuna run "/path/to/old-work" --profile profile.yaml --out ./archive-review --limit 20
+```
+
+Choose a model that fits your machine with `--model NAME`; the default is
+`gemma4:12b`. The local Ollama service must be running. `doctor` reports optional
+STL tools separately; their absence does not prevent archive triage.
+
+The default T1 tier sends names and metadata to the local model, without reading
+archive file contents. Dry-run previews planned evidence and writes; it makes
+no model requests, reads no archive file contents, and writes nothing. It still
+reads directory metadata, configuration, profiles, and existing stage files.
+
+## What you get
+
+| File | Purpose |
+| --- | --- |
+| `report.md` | Ranked folders, actions, reasons, and descriptions |
+| `novel.md` | Substantial work the model thinks is absent from your known-project list |
+| `dupes.md` / `dupes.json` | Metadata matches and same-name folder relationships |
+| `report.json` | Machine-readable analysis |
+| `manifest.json` and stage files | Saved scan, results, and resumable caches |
+
+Scores and novelty flags are model judgments to review. They are not statements
+of ownership, proof of value, or instructions to delete anything.
+
+Descriptions cover folders through depth 3 by default; `--max-depth N` changes
+that. A folder's evidence can include deeper descendants. Root-level files are
+included. `--limit N` caps folders in stable path order.
+
+## Privacy and evidence
+
+| Tier | Evidence supplied to the local model |
+| --- | --- |
+| T0 | Folder paths and subfolder names |
+| T1 (default) | T0 plus filenames, byte sizes, and extension counts |
+| T2 | T1 plus up to 3 text samples of 4 KiB each per folder |
+| T3 | T1 plus full text of up to 20 eligible files, at most 64 KiB each and 256 KiB total per folder |
+
+T2 considers recognized text extensions up to 1 MiB. T3 skips files that do not
+fit its bounds; it does not silently truncate them to T2 samples. Binary-like
+files containing NUL bytes are skipped. Caps are configurable.
+
+ArchiveTuna accepts only loopback Ollama origins, rejects known cloud-model
+names and remote-model metadata, and refuses HTTP redirects. Use a local Ollama
+server with downloaded models; do not put a cloud-forwarding proxy on that
+endpoint. For additional protection, run Ollama with `OLLAMA_NO_CLOUD=1`.
+Model downloads need network access. Local reports and profiles can contain
+sensitive paths and text-derived information; share them deliberately.
+
+See [privacy and evidence](docs/guide/privacy.md) for the exact boundaries.
+
+## Run stages separately
+
+```sh
+archivetuna scan "/path/to/old-work" --out ./archive-review
+archivetuna describe --out ./archive-review --limit 20
+archivetuna rank --profile profile.yaml --out ./archive-review --limit 20
+archivetuna report --out ./archive-review --limit 20
+archivetuna status --out ./archive-review
+```
+
+Use the same analysis settings across stages. `rank` consumes saved descriptions;
+`report` consumes saved descriptions and rankings without model calls or archive
+content reads. Mismatched scans/settings are rejected before reports are
+replaced. Re-running `run` reuses cache entries only when their actual evidence,
+folder context, model selection, and profile match.
+
+## STL models
+
+Requires **f3d** and **ImageMagick** for rendering. Vision descriptions also need
+a downloaded Ollama model with image support. Use `F3D` and `MAGICK` environment
+variables when the executables are not discoverable.
+
+```sh
+archivetuna models "/path/to/models" --dry-run
+archivetuna models "/path/to/models" --model YOUR_LOCAL_VISION_MODEL
+archivetuna models collage "/path/to/models"
+archivetuna models meta "/path/to/models" --no-vision
+```
+
+Writes `part-collage.png` and `part.stl.yaml` beside each STL. Existing outputs
+are skipped, including human notes. Facts-only metadata needs neither a collage
+nor Ollama. Vision sends the collage and filename/path clues to the local model.
+This explicit image workflow is separate from the text evidence tiers.
+
+## Configuration and migration
+
+Put overrides in `archivetuna.config.json` in the working directory.
+See the [configuration reference](docs/guide/configuration.md).
+
+ArchiveTuna was previously called **Sifter**. The source folder may still be named
+`sifter`. The command is now `archivetuna`; bare directory arguments print a
+hint instead of launching STL processing. Legacy `sifter.config.json` is read
+with a warning. Top-level `collage` and `meta` remain deprecated aliases.
+
+The output default is now `./archivetuna-out`. Use `--out ./sifter-out` to
+reuse an old manifest, then rerun describe/rank. Old model caches are intentionally
+ignored because their identity checks were incomplete.
+
+## Development and release
+
+```sh
+pnpm install
+pnpm test
+pnpm pack:smoke
+pnpm --dir site install
+pnpm site:build
+```
+
+The npm package is the repository root. The FilePress site is `site/`;
+`docs/guide/` supplies its `/docs` pages. See [release instructions](docs/RELEASE.md).
+Everything integration and additional file modes are planned, not implemented.
+
+**Sibling tool:** [MediaTuna](https://mediatuna.dev) makes older video and audio
+usable in modern formats while retaining available dates and tags. ArchiveTuna
+helps you discover what you have; MediaTuna helps keep that media playable.
+
+MIT licensed. Part of [Catalyst Forge](https://catalystforge.com/tools/).

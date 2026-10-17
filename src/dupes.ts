@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { DirStats, DupePair, IdenticalCluster, Manifest } from "./types.js";
+import type { DirStats, DupePair, MetadataCluster, Manifest } from "./types.js";
 
 /** Build per-directory recursive stats and fingerprints from the manifest. */
 export function buildDirStats(m: Manifest): Map<string, DirStats> {
@@ -33,9 +33,9 @@ export function buildDirStats(m: Manifest): Map<string, DirStats> {
 }
 
 export interface DupeResult {
-  clusters: IdenticalCluster[];
+  clusters: MetadataCluster[];
   pairs: DupePair[];
-  /** Paths subsumed by an identical-cluster representative (excluded from LLM stages). */
+  /** Reserved for future verified duplicates; metadata candidates never populate this set. */
   subsumed: Set<string>;
 }
 
@@ -62,18 +62,18 @@ function sample(set: Set<string>, other: Set<string>, n: number): string[] {
   return out;
 }
 
-/** Stage 1: identical clusters (global) + same-name pair classification. */
+/** Stage 1: metadata-match clusters (global) + same-name pair classification. */
 export function analyzeDupes(m: Manifest, statsMap: Map<string, DirStats>): DupeResult {
   const nonTrivial = [...statsMap.values()].filter((s) => s.fileCount > 0 && s.path !== "");
 
-  // --- identical clusters, global, by fingerprint ---
+  // --- metadata-match clusters, global, by fingerprint ---
   const byFp = new Map<string, DirStats[]>();
   for (const s of nonTrivial) {
     const arr = byFp.get(s.fingerprint);
     if (arr) arr.push(s);
     else byFp.set(s.fingerprint, [s]);
   }
-  const clusters: IdenticalCluster[] = [];
+  const clusters: MetadataCluster[] = [];
   const subsumed = new Set<string>();
   for (const group of byFp.values()) {
     if (group.length < 2) continue;
@@ -83,7 +83,7 @@ export function analyzeDupes(m: Manifest, statsMap: Map<string, DirStats>): Dupe
     members.sort((a, b) => a.path.length - b.path.length);
     const rep = members[0]!;
     const copies = members.slice(1).map((c) => c.path);
-    for (const c of copies) subsumed.add(c);
+    // Metadata matches must never suppress review of possibly different content.
     clusters.push({
       fingerprint: rep.fingerprint,
       representative: rep.path,

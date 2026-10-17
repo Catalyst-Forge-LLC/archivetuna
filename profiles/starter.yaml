@@ -1,0 +1,11 @@
+name: My archive
+statement: >
+  Find original writing, project designs, useful code, and work I may want to
+  revisit. Prioritize substantial personal work over downloaded dependencies,
+  tutorials, and third-party material. Surface unfamiliar projects too.
+projects: []
+topics:
+  - writing
+  - design
+  - software
+terms: []

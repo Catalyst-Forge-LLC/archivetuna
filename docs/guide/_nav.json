@@ -1,0 +1,38 @@
+[
+  {
+    "id": "getting-started",
+    "title": "Get started"
+  },
+  {
+    "id": "workflow",
+    "title": "Archive workflow"
+  },
+  {
+    "id": "profiles",
+    "title": "Write a profile"
+  },
+  {
+    "id": "privacy",
+    "title": "Privacy & evidence"
+  },
+  {
+    "id": "duplicates",
+    "title": "Duplicate candidates"
+  },
+  {
+    "id": "models",
+    "title": "STL models"
+  },
+  {
+    "id": "configuration",
+    "title": "Commands & configuration"
+  },
+  {
+    "id": "example",
+    "title": "Example report"
+  },
+  {
+    "id": "troubleshooting",
+    "title": "Troubleshooting"
+  }
+]

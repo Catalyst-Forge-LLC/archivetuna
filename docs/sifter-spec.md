@@ -1,3 +1,5 @@
+> Historical Sifter design (August 2026). The current product is ArchiveTuna. See [the README](../README.md), [current guide](guide/getting-started.md), and [release contract](RELEASE.md). These proposals are not a command reference.
+
 # Sifter — product & architecture spec (v2)
 
 *Living engineering spec for `z:\workspace\sifter`, 2026-08-03.

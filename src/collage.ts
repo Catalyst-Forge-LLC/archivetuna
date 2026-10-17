@@ -7,12 +7,12 @@
  */
 import { spawnSync } from "node:child_process";
 import {
-  existsSync, mkdtempSync, readdirSync, rmSync, statSync,
+  existsSync, mkdtempSync, readdirSync, rmSync, statSync, mkdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative } from "node:path";
 
-const F3D = process.env["F3D"] ?? "C:\\Program Files\\f3d\\bin\\f3d.exe";
+const F3D = process.env["F3D"] ?? (process.platform === "win32" && existsSync("C:/Program Files/f3d/bin/f3d.exe") ? "C:/Program Files/f3d/bin/f3d.exe" : "f3d");
 
 const VIEWS = [
   { name: "top", dir: "0,0,-1", axis: false },
@@ -29,7 +29,7 @@ function findMagick(): string {
   if (!spawnSync("magick", ["-version"], { stdio: "ignore" }).error) {
     return (magickPath = "magick");
   }
-  for (const dir of readdirSync("C:\\Program Files")) {
+  for (const dir of process.platform === "win32" && existsSync("C:/Program Files") ? readdirSync("C:/Program Files") : []) {
     if (/^ImageMagick/i.test(dir)) {
       const p = join("C:\\Program Files", dir, "magick.exe");
       if (existsSync(p)) return (magickPath = p);
@@ -46,9 +46,11 @@ function run(cmd: string, args: string[], what: string): void {
 
 /** Render one STL to <base>-collage.png; returns the collage path. */
 export function renderCollage(stl: string, outDir?: string, res = "700,700"): string {
-  const magick = findMagick();
   const base = basename(stl, extname(stl));
   const out = join(outDir ?? dirname(stl), `${base}-collage.png`);
+  if (existsSync(out)) return out;
+  mkdirSync(dirname(out), { recursive: true });
+  const magick = findMagick();
   const tmp = mkdtempSync(join(tmpdir(), "stl2collage-"));
   try {
     for (const v of VIEWS) {
@@ -91,11 +93,12 @@ export function* walkStl(root: string): Generator<string> {
 export interface BatchResult { rendered: number; skipped: number; failed: number }
 
 /** Render every STL under root that lacks a collage. Safe to re-run. */
-export function collageBatch(root: string, log: (line: string) => void): BatchResult {
+export function collageBatch(root: string, log: (line: string) => void, limit = 0): BatchResult {
   const res: BatchResult = { rendered: 0, skipped: 0, failed: 0 };
   for (const stl of walkStl(root)) {
     const out = join(dirname(stl), `${basename(stl, extname(stl))}-collage.png`);
     if (existsSync(out)) { res.skipped++; continue; }
+    if (limit && res.rendered + res.failed >= limit) break;
     try {
       renderCollage(stl);
       res.rendered++;
@@ -106,4 +109,10 @@ export function collageBatch(root: string, log: (line: string) => void): BatchRe
     }
   }
   return res;
+}
+
+export function renderTools(): Array<{name: string; path: string; ok: boolean}> {
+  let magick = "magick";
+  try { magick = findMagick(); } catch { /* optional */ }
+  return [{ name: "f3d", path: F3D, args: ["--version"] }, { name: "ImageMagick", path: magick, args: ["-version"] }].map(t => ({ name: t.name, path: t.path, ok: spawnSync(t.path, t.args, { stdio: "ignore", timeout: 5000 }).status === 0 }));
 }

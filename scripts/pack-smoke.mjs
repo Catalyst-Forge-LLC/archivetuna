@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const npmCli = process.env.npm_execpath;
+if (!npmCli || !existsSync(npmCli)) throw new Error('Run this script with npm run pack:smoke or pnpm pack:smoke.');
+// pnpm's npm_execpath points at pnpm. Locate npm beside Node for a real npm pack.
+const cli = /npm-cli\.js$/i.test(npmCli) ? npmCli : join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+if (!existsSync(cli)) throw new Error('Cannot locate npm; run npm run pack:smoke.');
+const temp = mkdtempSync(join(tmpdir(), 'archivetuna-pack-'));
+const cache = join(temp, 'npm-cache');
+const npm = (args, cwd = root) => execFileSync(process.execPath, [cli, ...args, '--cache', cache], { cwd, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+const raw = JSON.parse(npm(['pack', '--json', '--pack-destination', temp]));
+const pack = Array.isArray(raw) ? raw[0] : Object.values(raw)[0];
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+assert.equal(pack.name, 'archivetuna'); assert.equal(pack.version, pkg.version);
+const paths = pack.files.map(f => f.path);
+for (const file of ['dist/cli.js', 'dist/stages.js', 'profiles/starter.yaml', 'README.md', 'LICENSE']) assert(paths.includes(file), 'Missing ' + file);
+assert(!paths.some(p => /^(scratch|site|src|test)\//.test(p) || p === 'profiles/corpus.yaml'));
+const consumer = join(temp, 'consumer'); mkdirSync(consumer);
+npm(['install', '--prefix', consumer, '--ignore-scripts', '--no-audit', '--no-fund', join(temp, pack.filename)], consumer);
+const installed = join(consumer, 'node_modules/archivetuna');
+assert.equal(JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8')).name, 'archivetuna');
+assert.equal(readFileSync(join(installed, 'README.md'), 'utf8'), readFileSync(join(root, 'README.md'), 'utf8'));
+assert(readFileSync(join(installed, 'dist/cli.js'), 'utf8').startsWith('#!/usr/bin/env node'));
+const run = (...args) => execFileSync(process.execPath, [join(installed, 'dist/cli.js'), ...args], { cwd: consumer, encoding: 'utf8' });
+assert.equal(run('--version').trim(), pkg.version); assert.match(run('--help'), /ArchiveTuna/);
+run('init'); assert(existsSync(join(consumer, 'profile.yaml')));
+run('scan', installed, '--out', join(consumer, 'review'));
+run('dupes', '--out', join(consumer, 'review'));
+assert(existsSync(join(consumer, 'review', 'dupes.md')));
+console.log(JSON.stringify({ name: pack.name, version: pack.version, bytes: pack.size, files: paths.length, archive: join(temp, pack.filename), installedSmoke: 'passed' }, null, 2));

@@ -1,82 +1,74 @@
-import { open } from "node:fs/promises";
-import { join } from "node:path";
-import type { Manifest } from "./types.js";
-import type { SifterConfig } from "./config.js";
+import { open, lstat } from "node:fs/promises";
+import { resolve, relative, isAbsolute } from "node:path";
+import type { Manifest, FileEntry } from "./types.js";
+import type { ArchiveTunaConfig } from "./config.js";
 
 const TEXT_EXTS = new Set([
-  ".md", ".txt", ".markdown", ".rst", ".adoc", ".ff",
-  ".json", ".yaml", ".yml", ".xml", ".html", ".htm", ".csv",
-  ".js", ".ts", ".py", ".rb", ".php", ".java", ".cs", ".sql", ".sh", ".bat",
-  ".ini", ".cfg", ".conf", ".log", ".readme", ".doc1", ".text",
+  ".md", ".txt", ".markdown", ".rst", ".adoc", ".ff", ".json", ".yaml",
+  ".yml", ".xml", ".html", ".htm", ".csv", ".js", ".ts", ".py", ".rb",
+  ".php", ".java", ".cs", ".sql", ".sh", ".bat", ".ini", ".cfg", ".conf",
+  ".log", ".readme", ".doc1", ".text",
 ]);
-
-/**
- * Build the evidence block for one folder, honoring the privacy tier as a hard
- * boundary: this function is the ONLY place file contents are ever read, and
- * it reads nothing below tier 2.
- */
-export async function gatherEvidence(
-  m: Manifest,
-  dirPath: string,
-  cfg: SifterConfig,
-): Promise<{ text: string; filesConsidered: string[] }> {
-  const lines: string[] = [];
-  const dirName = dirPath.split("/").pop() ?? dirPath;
-  lines.push(`Folder name: ${dirName}`);
-  lines.push(`Folder path: /${dirPath}`);
-
-  // T0+: subfolder names (the tree is always evidence).
-  const subNames = m.dirs
-    .filter((d) => d.path.startsWith(dirPath + "/"))
-    .map((d) => d.path.slice(dirPath.length + 1))
-    .filter((p) => !p.includes("/"))
-    .slice(0, cfg.maxNamesInEvidence);
-  if (subNames.length > 0) lines.push(`Subfolders: ${subNames.join(", ")}`);
-
-  const files = m.files.filter((f) => f.dir === dirPath || f.dir.startsWith(dirPath + "/"));
-  const filesConsidered: string[] = [];
-
+export const filePath = (f: FileEntry): string => [f.dir, f.name].filter(Boolean).join("/");
+export function filesIn(m: Manifest, dir: string): FileEntry[] {
+  return m.files.filter(f => dir === "" || f.dir === dir || f.dir.startsWith(dir + "/"));
+}
+export function planEvidence(m: Manifest, dir: string, cfg: ArchiveTunaConfig): Array<{ file: FileEntry; bytes: number }> {
+  if (cfg.tier < 2) return [];
+  const candidates = filesIn(m, dir).filter(f => TEXT_EXTS.has(f.ext) && f.size > 0 &&
+    f.size <= (cfg.tier === 3 ? cfg.fullTextMaxBytesPerFile : 1024 * 1024))
+    .sort((a, b) => Number(a.dir !== dir) - Number(b.dir !== dir) || a.size - b.size || filePath(a).localeCompare(filePath(b)));
+  const result: Array<{ file: FileEntry; bytes: number }> = [];
+  let remaining = cfg.fullTextMaxTotalBytes;
+  for (const file of candidates) {
+    if (result.length >= (cfg.tier === 3 ? cfg.fullTextMaxFiles : cfg.sampleFilesPerDir)) break;
+    if (cfg.tier === 3 && file.size > remaining) continue;
+    const bytes = cfg.tier === 3 ? file.size : Math.min(file.size, cfg.sampleBytesPerFile);
+    if (bytes === 0) continue;
+    result.push({ file, bytes });
+    remaining -= bytes;
+  }
+  return result;
+}
+export async function gatherEvidence(m: Manifest, dir: string, cfg: ArchiveTunaConfig): Promise<{ text: string; filesConsidered: string[] }> {
+  const prefix = dir ? dir + "/" : "";
+  const lines = ["Folder name: " + (dir.split("/").pop() || "(root)"), "Folder path: /" + dir];
+  const subNames = m.dirs.filter(d => d.path !== dir && d.path.startsWith(prefix))
+    .map(d => d.path.slice(prefix.length)).filter(p => !p.includes("/")).sort().slice(0, cfg.maxNamesInEvidence);
+  if (subNames.length) lines.push("Subfolders: " + subNames.join(", "));
+  const files = filesIn(m, dir).sort((a, b) => Number(a.dir !== dir) - Number(b.dir !== dir) || filePath(a).localeCompare(filePath(b)));
   if (cfg.tier >= 1) {
-    // File names (direct children first, then notable deeper ones), ext histogram, sizes.
-    const direct = files.filter((f) => f.dir === dirPath);
-    const deeper = files.filter((f) => f.dir !== dirPath);
-    const named = [...direct, ...deeper].slice(0, cfg.maxNamesInEvidence);
-    if (named.length > 0) {
-      lines.push(
-        "Files (name, size): " +
-          named.map((f) => `${f.dir === dirPath ? "" : f.dir.slice(dirPath.length + 1) + "/"}${f.name} (${f.size}b)`).join(", "),
-      );
-    }
-    const extCount = new Map<string, number>();
-    for (const f of files) extCount.set(f.ext || "(none)", (extCount.get(f.ext || "(none)") ?? 0) + 1);
-    const hist = [...extCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)
-      .map(([e, c]) => `${e}:${c}`).join(" ");
-    lines.push(`Total files: ${files.length}. Extension histogram: ${hist}`);
+    lines.push("Files (name, size): " + files.slice(0, cfg.maxNamesInEvidence)
+      .map(f => filePath(f).slice(prefix.length) + " (" + f.size + "b)").join(", "));
+    const hist = new Map<string, number>();
+    for (const f of files) hist.set(f.ext || "(none)", (hist.get(f.ext || "(none)") ?? 0) + 1);
+    lines.push("Total files: " + files.length + ". Extension histogram: " +
+      [...hist].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12).map(([e, n]) => e + ":" + n).join(" "));
   }
-
-  if (cfg.tier >= 2) {
-    // Sampled content from small text files, size-capped. Tier 3 raises the caps in config.
-    const candidates = files
-      .filter((f) => TEXT_EXTS.has(f.ext) && f.size > 0 && f.size < 1024 * 1024)
-      .sort((a, b) => (a.dir === dirPath ? 0 : 1) - (b.dir === dirPath ? 0 : 1) || a.size - b.size)
-      .slice(0, cfg.sampleFilesPerDir);
-    for (const f of candidates) {
-      const full = join(m.root, f.dir.split("/").join("/"), f.name);
+  const filesConsidered: string[] = [];
+  for (const { file, bytes } of planEvidence(m, dir, cfg)) {
+    const name = filePath(file);
+    if (cfg.dryRun) { lines.push("Would read: " + name + " (up to " + bytes + " bytes)"); continue; }
+    const full = resolve(m.root, file.dir, file.name);
+    const rel = relative(resolve(m.root), full);
+    if (rel.startsWith("..") || isAbsolute(rel)) throw new Error("Evidence path escapes archive root: " + name);
+    try {
+      if (!(await lstat(full)).isFile()) continue;
+      const fh = await open(full, "r");
       try {
-        const fh = await open(full, "r");
-        const buf = Buffer.alloc(Math.min(cfg.sampleBytesPerFile, f.size));
-        await fh.read(buf, 0, buf.length, 0);
-        await fh.close();
-        const text = buf.toString("utf8").replace(/\u0000/g, "").trim();
-        if (text.length > 0) {
-          filesConsidered.push(`${f.dir}/${f.name}`);
-          lines.push(`--- Sample from ${f.name} ---\n${text}`);
+        const buf = Buffer.alloc(bytes);
+        let used = 0;
+        while (used < bytes) {
+          const r = await fh.read(buf, used, bytes - used, used);
+          if (!r.bytesRead) break;
+          used += r.bytesRead;
         }
-      } catch {
-        /* unreadable: skip */
-      }
-    }
+        const actual = buf.subarray(0, used);
+        if (actual.includes(0)) { lines.push("Skipped binary-like text file: " + name); continue; }
+        const text = actual.toString("utf8").trim();
+        if (text) { filesConsidered.push(name); lines.push("--- " + (cfg.tier === 3 ? "Text" : "Sample") + " from " + name + " ---\n" + text); }
+      } finally { await fh.close(); }
+    } catch { lines.push("Unreadable evidence: " + name); }
   }
-
   return { text: lines.join("\n"), filesConsidered };
 }

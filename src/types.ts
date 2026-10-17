@@ -18,6 +18,8 @@ export interface DirEntry {
 export interface Manifest {
   root: string;
   scannedAt: string;
+  backend?: "walk";
+  warnings?: string[];
   tier: number;
   dirs: DirEntry[];
   files: FileEntry[];
@@ -33,7 +35,7 @@ export interface DirStats {
   childKeys: Set<string>;
 }
 
-export type DupeKind = "identical" | "superset" | "diverged" | "name-collision";
+export type DupeKind = "superset" | "diverged" | "name-collision";
 
 export interface DupePair {
   kind: DupeKind;
@@ -48,7 +50,7 @@ export interface DupePair {
   onlyInBSample: string[];
 }
 
-export interface IdenticalCluster {
+export interface MetadataCluster {
   fingerprint: string;
   representative: string;
   copies: string[];

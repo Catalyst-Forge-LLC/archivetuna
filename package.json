@@ -1,26 +1,55 @@
 {
-  "name": "sifter",
-  "version": "0.1.0",
-  "description": "Local-first archive triage: map, dedupe, describe, and rank old folders for review — no data leaves your machine.",
+  "name": "archivetuna",
+  "version": "0.2.0",
+  "description": "Digital archaeology for the things you made, collected, and forgot. Local archive inventory, review reports, and STL metadata.",
   "type": "module",
   "license": "MIT",
+  "author": "Catalyst Forge LLC",
+  "homepage": "https://archivetuna.dev",
   "bin": {
-    "sifter": "./dist/cli.js"
+    "archivetuna": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "profiles/starter.yaml",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "sifter": "tsx src/cli.ts",
+    "archivetuna": "node dist/cli.js",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepack": "npm run build",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
+    "site:build": "pnpm --dir site build",
+    "site:dev": "pnpm --dir site dev",
+    "ship": "pnpm --dir site ship"
   },
   "engines": {
     "node": ">=22"
   },
+  "keywords": [
+    "archive",
+    "digital-archaeology",
+    "preservation",
+    "ollama",
+    "local-first",
+    "cli"
+  ],
   "dependencies": {
     "yaml": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@10.30.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Catalyst-Forge-LLC/archivetuna.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Catalyst-Forge-LLC/archivetuna/issues"
   }
 }

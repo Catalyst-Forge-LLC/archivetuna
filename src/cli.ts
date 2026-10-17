@@ -1,257 +1,188 @@
 #!/usr/bin/env node
-import { readFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { loadConfig, loadProfile, type SifterConfig } from "./config.js";
+import { readFileSync, existsSync, statSync, writeFileSync } from "node:fs";
+import { join, resolve, basename, dirname, extname } from "node:path";
+import { parseArgs } from "node:util";
+import { loadConfig, loadProfile, type ArchiveTunaConfig } from "./config.js";
 import { inventory, saveManifest } from "./inventory.js";
 import { buildDirStats, analyzeDupes } from "./dupes.js";
-import { checkHealth } from "./ollama.js";
-import { describeStage, rankStage, selectTargets } from "./stages.js";
-import { writeReports } from "./report.js";
-import { collageBatch, renderCollage } from "./collage.js";
+import { checkHealth, localEndpoint } from "./ollama.js";
+import { describeStage, rankStage, selectTargets, loadDescriptions, loadResults } from "./stages.js";
+import { writeReports, writeDupeReports } from "./report.js";
+import { collageBatch, renderCollage, walkStl, renderTools } from "./collage.js";
 import { metaBatch } from "./sidecar.js";
-import { statSync } from "node:fs";
+import { gatherEvidence } from "./evidence.js";
+import { readJson } from "./storage.js";
 import type { Manifest } from "./types.js";
 
-function parseArgs(argv: string[]): { cmd: string; positional: string[]; flags: Record<string, string | boolean> } {
-  const [cmd = "help", ...rest] = argv;
-  const positional: string[] = [];
-  const flags: Record<string, string | boolean> = {};
-  for (let i = 0; i < rest.length; i++) {
-    const a = rest[i]!;
-    if (a.startsWith("--")) {
-      const key = a.slice(2);
-      const next = rest[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
-        flags[key] = next;
-        i++;
-      } else flags[key] = true;
-    } else positional.push(a);
-  }
-  return { cmd, positional, flags };
-}
-
-const COMMANDS = new Set([
-  "run", "scan", "dupes", "describe", "rank", "report", "status",
-  "collage", "meta", "help",
-]);
-
 function usage(): void {
-  console.log(`sifter — local-first archive triage (nothing leaves this machine)
+  console.log(`ArchiveTuna — digital archaeology for the things you made, collected, and forgot.
 
 Usage:
-  sifter <dir>            STL pipeline: collage then meta (the usual command)
-  sifter collage <stl|dir>  five-view collage(s) only; recursive for a dir,
-                            output adjacent to each STL, skips existing
-  sifter meta <dir>         <name>.stl.yaml sidecars only (needs collages;
-                            --no-vision for facts only)
+  archivetuna init [profile.yaml]       create a starter profile (default profile.yaml)
+  archivetuna scan <root>               inventory names and metadata; no model needed
+  archivetuna dupes                     save duplicate candidates from the manifest
+  archivetuna run <root> --profile FILE scan, describe, rank, and write reports
+  archivetuna describe                  describe folders in the saved manifest
+  archivetuna rank --profile FILE       rank saved descriptions
+  archivetuna report                    rebuild reports from matching saved results
+  archivetuna status                    show saved manifest and analysis files
+  archivetuna doctor                    check local Ollama and optional render tools
+  archivetuna models <dir>              STL collages then YAML sidecars
+  archivetuna models collage <stl|dir>   collages only
+  archivetuna models meta <dir>         sidecars only
 
-  sifter run <root>       all stages: scan, dupes, describe, rank, report
-  sifter scan <root>      stage 0: inventory (folders + file metadata only)
-  sifter dupes            stage 1: duplicate analysis from cached manifest
-  sifter describe         stage 2: local-LLM folder descriptions
-  sifter rank             stage 3: relevance vs profile
-  sifter report           stage 4: write report.md / dupes.md / novel.md / report.json
-  sifter status           cache and Ollama health
+Options:
+  --out DIR        triage output/cache directory (default ./archivetuna-out)
+                   models collage <file>: optional output directory
+  --profile FILE   owner profile, required for run/rank; optional match check for report
+  --tier 0|1|2|3   folder names / metadata / samples / bounded full text (default 1)
+  --model NAME     downloaded local Ollama model (default gemma4:12b)
+  --limit N        folder or per-stage model batch limit; 0 means unlimited
+  --max-depth N    deepest folder to describe (default 3)
+  --no-vision      models: machine facts without vision inference
+  --dry-run        preview reads/writes; no archive content reads, model calls, or writes
+  --help, -h       show help
+  --version, -v    show version
 
-Flags:
-  --out <dir>       output/cache dir (default ./sifter-out)
-  --tier <0-3>      privacy tier (default 1; content is read only at 2+)
-  --profile <file>  profile YAML (required for rank/run)
-  --model <name>    Ollama model (default gemma4:12b)
-  --limit <n>       cap number of folders sent to LLM stages / sidecars written
-  --no-vision       meta: skip the vision description, machine facts only
-  --dry-run         show what would be read/sent, without doing it
+Config: archivetuna.config.json in the current directory.
+Duplicate matches use names and sizes, never proof of identical contents.
 `);
 }
-
-async function runCollage(target: string, outFlag: string | boolean | undefined): Promise<void> {
-  const t = resolve(target);
-  if (statSync(t).isDirectory()) {
-    const r = collageBatch(t, console.log);
-    console.log("----");
-    console.log(`rendered: ${r.rendered}  skipped(existing): ${r.skipped}  failed: ${r.failed}`);
-  } else {
-    console.log(renderCollage(t, outFlag ? String(outFlag) : undefined));
-  }
+function loadManifest(cfg: ArchiveTunaConfig): Manifest {
+  const path = join(cfg.out, "manifest.json");
+  if (!existsSync(path)) throw new Error("No manifest. Run 'archivetuna scan <root>' first, with the same --out.");
+  const m = readJson<Manifest>(path);
+  if (!m || typeof m.root !== "string" || !Array.isArray(m.dirs) || !Array.isArray(m.files)) throw new Error("Invalid manifest: " + path);
+  return m;
 }
-
-async function runMeta(
-  root: string,
-  ollama: { url: string; model: string },
-  opts: { vision: boolean; limit?: number },
-): Promise<void> {
-  if (opts.vision) {
-    const h = await checkHealth(ollama);
-    if (!h.ok) {
-      console.error(`Ollama not ready: ${h.message}`);
-      process.exit(1);
-    }
-  }
-  const r = await metaBatch(resolve(root), ollama, opts, console.log);
-  console.log("----");
-  console.log(`written: ${r.written}  skipped(existing): ${r.skipped}  failed: ${r.failed}  missing-collage: ${r.missingCollage}`);
+function directory(value: string | undefined): string {
+  if (!value) throw new Error("Missing directory. See archivetuna --help.");
+  const p = resolve(value);
+  if (!statSync(p).isDirectory()) throw new Error("Expected a directory: " + value);
+  return p;
 }
-
-function loadManifestOrDie(cfg: SifterConfig): Manifest {
-  const p = join(cfg.out, "manifest.json");
-  if (!existsSync(p)) {
-    console.error(`No manifest at ${p}. Run 'sifter scan <root>' first.`);
-    process.exit(1);
-  }
-  return JSON.parse(readFileSync(p, "utf8")) as Manifest;
-}
-
-const progress = (label: string) => (done: number, total: number, path: string) => {
-  process.stdout.write(`\r${label}: ${done}/${total} ${path.slice(0, 70).padEnd(70)}`);
-  if (done === total) process.stdout.write("\n");
-};
-
+const progress = (done: number, total: number, path: string) => console.log("  " + done + "/" + total + " /" + path);
 async function main(): Promise<void> {
-  let { cmd, positional, flags } = parseArgs(process.argv.slice(2));
-  // Bare path (`sifter <dir>`) → collage then meta.
-  if (!COMMANDS.has(cmd)) {
-    positional = [cmd, ...positional];
-    cmd = "folder";
+  const { positionals, values } = parseArgs({ allowPositionals: true, strict: true, options: {
+    out: { type: "string" }, profile: { type: "string" }, tier: { type: "string" },
+    model: { type: "string" }, limit: { type: "string" }, "max-depth": { type: "string" },
+    "no-vision": { type: "boolean" }, "dry-run": { type: "boolean" },
+    help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
+  } });
+  if (values.version) { console.log(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version); return; }
+  let [cmd = "help", ...args] = positionals;
+  if (values.help || cmd === "help") { usage(); return; }
+  const commands = ["init", "run", "scan", "dupes", "describe", "rank", "report", "status", "doctor", "models", "collage", "meta"];
+  if (!commands.includes(cmd)) {
+    throw new Error(existsSync(cmd) ? "Choose 'archivetuna run <dir> --profile FILE' for triage or 'archivetuna models <dir>' for STL processing." : "Unknown command: " + cmd + ". See archivetuna --help.");
   }
-  const overrides: Partial<SifterConfig> = {};
-  if (flags["out"]) overrides.out = String(flags["out"]);
-  if (flags["tier"]) overrides.tier = Number(flags["tier"]) as SifterConfig["tier"];
-  if (flags["model"]) overrides.model = String(flags["model"]);
-  if (flags["limit"]) overrides.limit = Number(flags["limit"]);
-  if (flags["dry-run"]) overrides.dryRun = true;
+  if (cmd === "collage" || cmd === "meta") {
+    console.warn("Deprecated alias; use archivetuna models " + cmd + ".");
+    args = [cmd, ...args]; cmd = "models";
+  }
+  const allowed: Record<string, string[]> = {
+    init: ["dry-run"], scan: ["out", "dry-run"], dupes: ["out", "dry-run"],
+    run: ["out", "profile", "tier", "model", "limit", "max-depth", "dry-run"],
+    describe: ["out", "tier", "model", "limit", "max-depth", "dry-run"],
+    rank: ["out", "profile", "tier", "model", "limit", "max-depth", "dry-run"],
+    report: ["out", "profile", "tier", "model", "limit", "max-depth", "dry-run"],
+    status: ["out"], doctor: ["model"], models: ["out", "model", "limit", "no-vision", "dry-run"],
+  };
+  for (const flag of Object.keys(values)) if (!allowed[cmd]!.includes(flag)) throw new Error("--" + flag + " is not supported by " + cmd + ".");
+  if (cmd !== "models" && args.length > (["run", "scan", "init"].includes(cmd) ? 1 : 0)) throw new Error("Unexpected arguments for " + cmd + ".");
+  const overrides: Partial<ArchiveTunaConfig> = {};
+  if (values.out !== undefined) overrides.out = values.out;
+  if (values.model !== undefined) overrides.model = values.model;
+  if (values.tier !== undefined) overrides.tier = Number(values.tier) as ArchiveTunaConfig["tier"];
+  if (values.limit !== undefined) overrides.limit = Number(values.limit);
+  if (values["max-depth"] !== undefined) overrides.maxDepth = Number(values["max-depth"]);
+  if (values["dry-run"]) overrides.dryRun = true;
   const cfg = loadConfig(process.cwd(), overrides);
   const ollama = { url: cfg.ollamaUrl, model: cfg.model };
-  const vision = !flags["no-vision"];
-  const metaOpts = { vision, limit: cfg.limit || undefined };
-
-  switch (cmd) {
-    case "folder": {
-      const root = positional[0];
-      if (!root) return usage();
-      const t = resolve(root);
-      if (!existsSync(t) || !statSync(t).isDirectory()) {
-        console.error(`Expected a directory: ${root}`);
-        process.exit(1);
-      }
-      console.log(`[1/2] Collage ${t} ...`);
-      await runCollage(t, flags["out"]);
-      console.log(`[2/2] Meta ${t} ...`);
-      await runMeta(t, ollama, metaOpts);
-      break;
-    }
-    case "scan": {
-      const root = positional[0];
-      if (!root) return usage();
-      console.log(`Scanning ${root} (tier boundary: metadata only) ...`);
-      const m = await inventory(resolve(root), {
-        prune: cfg.prune,
-        onProgress: (d, f) => process.stdout.write(`\r  dirs: ${d}  files: ${f}`),
-      });
-      process.stdout.write("\n");
-      const p = saveManifest(cfg.out, m);
-      console.log(`Manifest: ${p} (${m.dirs.length} dirs, ${m.files.length} files)`);
-      break;
-    }
-    case "dupes": {
-      const m = loadManifestOrDie(cfg);
-      const stats = buildDirStats(m);
-      const res = analyzeDupes(m, stats);
-      console.log(`Identical clusters: ${res.clusters.length} (subsuming ${res.subsumed.size} copies)`);
-      console.log(`Same-name pairs: ${res.pairs.length} ` +
-        `(superset ${res.pairs.filter((p) => p.kind === "superset").length}, ` +
-        `diverged ${res.pairs.filter((p) => p.kind === "diverged").length}, ` +
-        `collisions ${res.pairs.filter((p) => p.kind === "name-collision").length})`);
-      break;
-    }
-    case "collage": {
-      const target = positional[0];
-      if (!target) return usage();
-      await runCollage(target, flags["out"]);
-      break;
-    }
-    case "meta": {
-      const root = positional[0];
-      if (!root) return usage();
-      await runMeta(root, ollama, metaOpts);
-      break;
-    }
-    case "status": {
-      console.log(`Config: tier T${cfg.tier}, model ${cfg.model}, out ${cfg.out}`);
-      const h = await checkHealth(ollama);
-      console.log(h.ok ? `OK: ${h.message}` : `NOT READY: ${h.message}`);
-      const mp = join(cfg.out, "manifest.json");
-      console.log(existsSync(mp) ? `Manifest present: ${mp}` : "No manifest yet.");
-      break;
-    }
-    case "describe":
-    case "rank":
-    case "run": {
-      let m: Manifest;
-      if (cmd === "run") {
-        const root = positional[0];
-        if (!root) return usage();
-        console.log(`[0/4] Scanning ${root} ...`);
-        m = await inventory(resolve(root), {
-          prune: cfg.prune,
-          onProgress: (d, f) => process.stdout.write(`\r  dirs: ${d}  files: ${f}`),
-        });
-        process.stdout.write("\n");
-        saveManifest(cfg.out, m);
-      } else {
-        m = loadManifestOrDie(cfg);
-      }
-
-      const stats = buildDirStats(m);
-      const dupes = analyzeDupes(m, stats);
-      if (cmd === "run") {
-        console.log(`[1/4] Dupes: ${dupes.clusters.length} identical clusters, ${dupes.pairs.length} same-name pairs.`);
-      }
-
-      if (!cfg.dryRun) {
-        const h = await checkHealth(ollama);
-        if (!h.ok) {
-          console.error(`Ollama not ready: ${h.message}`);
-          process.exit(1);
-        }
-      }
-
-      const targets = selectTargets(m, stats, dupes.subsumed, cfg);
-      console.log(`LLM targets: ${targets.length} folders (representatives, depth<=3, tier T${cfg.tier}${cfg.limit ? `, limit ${cfg.limit}` : ""})`);
-
-      const descriptions = await describeStage(m, targets, cfg, ollama, stats, progress("[2/4] describe"));
-      if (cmd === "describe") {
-        for (const d of descriptions.slice(0, 20)) console.log(`- /${d.path}: ${d.description}`);
-        break;
-      }
-
-      const profilePath = flags["profile"] ? String(flags["profile"]) : undefined;
-      if (!profilePath) {
-        console.error("rank/run requires --profile <file.yaml>");
-        process.exit(1);
-      }
-      const profile = loadProfile(profilePath);
-      const rankings = await rankStage(m, descriptions, profile, cfg, ollama, stats, progress("[3/4] rank"));
-
-      const written = writeReports(m, dupes, descriptions, rankings, cfg);
-      console.log(`[4/4] Reports:\n` + written.map((w) => `  ${w}`).join("\n"));
-      break;
-    }
-    case "report": {
-      const m = loadManifestOrDie(cfg);
-      const stats = buildDirStats(m);
-      const dupes = analyzeDupes(m, stats);
-      // Rebuild from caches only (no LLM calls): use cached describe/rank entries present for current settings.
-      console.log("Report from caches requires prior describe+rank with matching tier/model; use 'run' for the full pipeline.");
-      const written = writeReports(m, dupes, [], [], cfg);
-      console.log(written.map((w) => `  ${w}`).join("\n"));
-      break;
-    }
-    default:
-      usage();
+  if (cmd === "init") {
+    const path = resolve(args[0] ?? "profile.yaml");
+    if (existsSync(path)) throw new Error("Profile already exists: " + path);
+    if (cfg.dryRun) { console.log("Would write starter profile: " + path); return; }
+    writeFileSync(path, readFileSync(new URL("../profiles/starter.yaml", import.meta.url)), { flag: "wx" });
+    console.log("Created " + path + ". Edit it to describe what you want to rediscover."); return;
   }
+  if (cmd === "status") {
+    console.log("Output: " + cfg.out);
+    for (const file of ["manifest.json", "descriptions.json", "rankings.json", "report.md"]) console.log(file + ": " + (existsSync(join(cfg.out, file)) ? "present" : "missing"));
+    return;
+  }
+  if (cmd === "doctor") {
+    console.log("Node " + process.versions.node + "; inventory and duplicate analysis need no model.");
+    const health = await checkHealth(ollama);
+    console.log("Ollama: " + health.message);
+    for (const tool of renderTools()) console.log(tool.name + ": " + (tool.ok ? tool.path : "not found (optional; STL rendering only)"));
+    if (!health.ok) process.exitCode = 1;
+    return;
+  }
+  if (cmd === "models") {
+    const mode = ["collage", "meta"].includes(args[0] ?? "") ? args.shift()! : "all";
+    if (args.length !== 1) throw new Error("Expected one STL path/directory. See archivetuna models --help.");
+    const target = resolve(args[0]!);
+    const isDir = statSync(target).isDirectory();
+    if (!isDir && (mode !== "collage" || extname(target).toLowerCase() !== ".stl")) throw new Error("Only models collage accepts a single STL file.");
+    if (values.out && (isDir || mode !== "collage")) throw new Error("--out is supported only for a single STL collage; batch artifacts are adjacent.");
+    if (cfg.dryRun) {
+      let n = 0;
+      for (const stl of isDir ? walkStl(target) : [target]) {
+        if (cfg.limit && n >= cfg.limit) break;
+        const base = basename(stl, extname(stl));
+        const png = join(values.out ? cfg.out : dirname(stl), base + "-collage.png");
+        const yaml = join(dirname(stl), base + ".stl.yaml");
+        const collageNeeded = mode !== "meta" && !existsSync(png);
+        const metaNeeded = mode !== "collage" && !existsSync(yaml);
+        if (!collageNeeded && !metaNeeded) continue;
+        n++;
+        if (collageNeeded) console.log("Would read STL and write collage: " + stl + " -> " + png);
+        if (metaNeeded) console.log("Would write " + yaml + (values["no-vision"] ? " (file metadata only)" : "; would read collage and send image + filename/path clues to local model " + cfg.model));
+      }
+      console.log("Dry-run: no content read, model calls, or writes."); return;
+    }
+    if (mode !== "collage" && !values["no-vision"]) {
+      const h = await checkHealth(ollama); if (!h.ok) throw new Error(h.message);
+    }
+    if (mode !== "meta") {
+      if (isDir) {
+        const r = collageBatch(target, console.log, cfg.limit); console.log(JSON.stringify(r)); if (r.failed) process.exitCode = 1;
+      } else console.log(renderCollage(target, values.out ? cfg.out : undefined));
+    }
+    if (mode !== "collage") {
+      const r = await metaBatch(target, ollama, { vision: !values["no-vision"], limit: cfg.limit }, console.log);
+      console.log(JSON.stringify(r)); if (r.failed || r.missingCollage) process.exitCode = 1;
+    }
+    return;
+  }
+  const profile = values.profile ? loadProfile(values.profile) : undefined;
+  if (["rank", "run"].includes(cmd) && !profile) throw new Error(cmd + " requires --profile FILE. Create one with archivetuna init.");
+  if (["run", "describe", "rank"].includes(cmd)) localEndpoint(ollama);
+  const m = ["scan", "run"].includes(cmd) ? await inventory(directory(args[0]), { prune: cfg.prune, exclude: [cfg.out] }) : loadManifest(cfg);
+  if (m.warnings?.length) console.warn(m.warnings.length + " scan warning(s):\n" + m.warnings.join("\n"));
+  if (cmd === "scan") {
+    console.log(m.dirs.length + " folders; " + m.files.length + " files.");
+    console.log(cfg.dryRun ? "Would write " + join(cfg.out, "manifest.json") + "; metadata read only." : saveManifest(cfg.out, m)); return;
+  }
+  const stats = buildDirStats(m), dupes = analyzeDupes(m, stats);
+  const targets = selectTargets(m, stats, dupes.subsumed, cfg);
+  if (cfg.dryRun) {
+    if (["run", "describe"].includes(cmd)) for (const target of targets) console.log((await gatherEvidence(m, target, cfg)).text + "\n");
+    if (cmd === "rank") console.log("Would rank " + loadDescriptions(m, cfg).length + " saved descriptions using profile " + profile!.name + ".");
+    if (cmd === "report") { const r = loadResults(m, cfg, profile); console.log("Would rebuild reports with " + r.rankings.length + " rankings."); }
+    console.log("Would write " + (cmd === "dupes" ? "dupes.md and dupes.json" : cmd === "describe" ? "description caches" : cmd === "rank" ? "ranking caches and reports" : "reports/caches") + " under " + cfg.out);
+    console.log("Dry-run: no archive content read, model calls, or writes."); return;
+  }
+  if (cmd === "dupes") { console.log(writeDupeReports(m, dupes, cfg.out).join("\n")); return; }
+  if (cmd === "report") {
+    const r = loadResults(m, cfg, profile); console.log(writeReports(m, dupes, r.descriptions, r.rankings, cfg).join("\n")); return;
+  }
+  const descriptions = cmd === "rank" ? loadDescriptions(m, cfg) : undefined;
+  if (cmd === "run") saveManifest(cfg.out, m);
+  const desc = descriptions ?? await describeStage(m, targets, cfg, ollama, stats, progress);
+  if (cmd === "describe") { console.log("Saved " + desc.length + " descriptions."); return; }
+  const rankings = await rankStage(m, desc, profile!, cfg, ollama, stats, progress);
+  console.log(writeReports(m, dupes, desc, rankings, cfg).join("\n"));
 }
-
-main().catch((err) => {
-  console.error((err as Error).stack ?? String(err));
-  process.exit(1);
-});
+main().catch(err => { console.error("ArchiveTuna: " + (err as Error).message); process.exitCode = 1; });
