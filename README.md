@@ -1,6 +1,6 @@
 # ArchiveTuna
 
-<img src="https://archivetuna.dev/logo.png" width="440" alt="ArchiveTuna: a silver-blue tuna with archive drawings and digital fragments.">
+<img src="https://archivetuna.dev/logo.png" width="440" alt="ArchiveTuna: a muted bronze tuna with archive drawings and digital fragments.">
 
 **Digital archaeology for the things you made, collected, and forgot.**
 
