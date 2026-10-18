@@ -11,9 +11,9 @@
     "ship": "pnpm build && wrangler pages deploy build --project-name archivetuna --branch main"
   },
   "devDependencies": {
-    "getfilepress": "0.1.50",
-    "wrangler": "^4.120.1",
-    "marked": "^16.4.2"
+    "getfilepress": "0.1.51",
+    "marked": "^16.4.2",
+    "wrangler": "^4.120.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
