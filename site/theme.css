@@ -7,3 +7,6 @@ html{scroll-behavior:smooth}body{margin:0;background:var(--at-paper);color:var(-
 .site-logo{width:82px;height:40px;object-fit:contain}
 .at-mascot{display:block;width:280px;max-width:78%;height:auto;margin:0 0 24px}
 @media(max-width:700px){.site-logo{width:66px;height:34px}.at-mascot{width:235px;margin-bottom:20px}}
+
+/* Keep qualifications and examples readable at normal size. */
+.at-home .at-eyebrow,.at-home .at-small,.at-home .at-record-caption,.at-home .at-release,.at-home .at-terminal p{font-size:.875rem;line-height:1.6}.at-record-top,.at-terminal-top{font-size:.8rem}.at-home .at-text-link,.at-home .at-button{font-size:1rem}.at-home .at-find p,.at-find strong{font-size:1rem}.at-home .at-details p:not(.at-eyebrow),.at-home .at-steps p,.at-home .at-family p:not(.at-eyebrow){font-size:1rem}
