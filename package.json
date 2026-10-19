@@ -1,6 +1,6 @@
 {
   "name": "archivetuna",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Digital archaeology for the things you made, collected, and forgot. Local archive inventory, review reports, and STL metadata.",
   "type": "module",
   "license": "MIT",
