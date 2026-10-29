@@ -1,0 +1,14 @@
+format: appledger
+format_version: 0.1.0
+ledger_id: ledger-ce6c2291-4b81-4b39-aece-9c97cf08bc81
+application_id: app-5b538594-7bd5-416e-813d-7460031ab865
+repositories:
+  - id: repo-home
+    root: .
+record_roots:
+  - records
+bindings: []
+profiles:
+  - id: forgetrail
+    version: 0.1.0
+    path: profiles/forgetrail.yaml

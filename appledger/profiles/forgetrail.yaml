@@ -1,0 +1,20 @@
+profile: forgetrail
+profile_version: 0.1.0
+archetype: product
+project_status: active
+current_phase_instance: phase-consolidation-plan-1
+phase_instances:
+  - id: phase-consolidation-plan-1
+    phase: plan
+    status: in_progress
+    started_at: 2026-10-28T23:52:22Z
+    criteria:
+      - id: consolidation-spec-review
+        text: Review the consolidation delivery spec and distinguish accepted requirements from proposed implementation choices
+        status: pending
+        evidence_refs: []
+      - id: consolidation-m0-readiness
+        text: Resolve M0 architecture choices and agree the first implementation milestone
+        status: pending
+        evidence_refs: []
+transitions: []
